@@ -11,39 +11,35 @@ const rl = readline.createInterface({
 // Obtener el nombre del directorio actual
 const repoName = path.basename(process.cwd());
 
-// Preguntar al usuario su nombre de usuario y contraseña de GitHub
-rl.question('GitHub Username: ', (username) => {
-  rl.question('GitHub Password: ', (password) => {
-    const remote = `https://${username}:${password}@github.com/${username}/${repoName}.git`;
+// Inicializar el repositorio git
+const git = simpleGit();
 
-    // Inicializar el repositorio git
-    const git = simpleGit();
-
+async function run() {
+  try {
     // Verificar si el remoto 'origin' ya existe
-    git.getRemotes(true, (err, remotes) => {
-      if (err) {
-        console.error('Error getting remotes:', err);
-        rl.close();
-        return;
-      }
+    const remotes = await git.getRemotes(true);
+    const originRemote = remotes.find(remote => remote.name === 'origin');
 
-      const originRemote = remotes.find(remote => remote.name === 'origin');
+    // URL remota SSH
+    const remote = `git@github.com:Jtejero8/${repoName}.git`;
 
-      const addOrUpdateRemote = originRemote ? git.remote(['set-url', 'origin', remote]) : git.addRemote('origin', remote);
+    if (originRemote) {
+      await git.remote(['set-url', 'origin', remote]);
+    } else {
+      await git.addRemote('origin', remote);
+    }
 
-      addOrUpdateRemote
-        .then(() => git.add('.'))
-        .then(() => git.commit('Initial commit'))
-        .then(() => git.branch(['-M', 'main']))  // Renombrar la rama a main
-        .then(() => git.push('origin', 'main'))  // Empujar a la rama main
-        .then(() => {
-          console.log(`Repository '${repoName}' successfully created and pushed to GitHub.`);
-          rl.close();
-        })
-        .catch((err) => {
-          console.error('Error:', err);
-          rl.close();
-        });
-    });
-  });
-});
+    await git.add('.');
+    await git.commit('Initial commit');
+    await git.branch(['-M', 'main']);  // Renombrar la rama a main
+    await git.push('origin', 'main');  // Empujar a la rama main
+
+    console.log(`Repository '${repoName}' successfully created and pushed to GitHub.`);
+  } catch (err) {
+    console.error('Error:', err);
+  } finally {
+    rl.close();
+  }
+}
+
+run();
