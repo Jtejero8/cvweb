@@ -1,12 +1,6 @@
 const simpleGit = require('simple-git');
-const readline = require('readline');
 const path = require('path');
-
-// Crear una interfaz para leer la entrada del usuario
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
+const fs = require('fs');
 
 // Obtener el nombre del directorio actual
 const repoName = path.basename(process.cwd());
@@ -37,8 +31,6 @@ async function run() {
     console.log(`Repository '${repoName}' successfully created and pushed to GitHub.`);
   } catch (err) {
     console.error('Error:', err);
-  } finally {
-    rl.close();
   }
 }
 
