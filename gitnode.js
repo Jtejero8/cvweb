@@ -15,43 +15,69 @@ async function run() {
     { type: 'password', name: 'token', message: 'GitHub token:', mask: '*' }
   ]);
 
-  // Intenta crear el repositorio en GitHub
+  // Verifica si el repositorio ya existe en GitHub
+  let repositoryExists = false;
   try {
-    const response = await axios.post(
-      'https://api.github.com/user/repos',
-      {
-        name: folderName,
-        private: false
-      },
-      {
-        auth: {
-          username: credentials.username,
-          password: credentials.token
-        }
+    const response = await axios.get(`https://api.github.com/repos/${credentials.username}/${folderName}`, {
+      headers: {
+        Authorization: `token ${credentials.token}`
       }
-    );
-
-    if (response.status === 201) {
-      console.log(`Repository '${folderName}' created on GitHub.`);
-    } else {
-      console.log(`Failed to create repository: ${response.status}`);
-      return;
+    });
+    if (response.status === 200) {
+      repositoryExists = true;
+      console.log(`Repository '${folderName}' already exists on GitHub.`);
     }
   } catch (error) {
-    if (error.response && error.response.status === 422) {
-      console.log(`Repository '${folderName}' already exists on GitHub.`);
+    if (error.response && error.response.status === 404) {
+      // No se encontró el repositorio en GitHub, se puede crear
+      repositoryExists = false;
     } else {
+      console.error('Error checking repository on GitHub:', error.response ? error.response.data : error.message);
+      return;
+    }
+  }
+
+  // Si el repositorio no existe en GitHub, intenta crearlo
+  if (!repositoryExists) {
+    try {
+      const createResponse = await axios.post(
+        'https://api.github.com/user/repos',
+        {
+          name: folderName,
+          private: false
+        },
+        {
+          auth: {
+            username: credentials.username,
+            password: credentials.token
+          }
+        }
+      );
+
+      if (createResponse.status === 201) {
+        console.log(`Repository '${folderName}' created on GitHub.`);
+      } else {
+        console.log(`Failed to create repository: ${createResponse.status}`);
+        return;
+      }
+    } catch (error) {
       console.error('Error creating repository on GitHub:', error.response ? error.response.data : error.message);
       return;
     }
   }
 
-  // Configura la URL remota y realiza el push usando SSH
+  // Configura la URL remota solo si no existe ya
   try {
-    await git.init();
+    const remoteExists = await git.getRemotes(true);
+    const remoteOriginExists = remoteExists.some(remote => remote.name === 'origin');
+
+    if (!remoteOriginExists) {
+      await git.addRemote('origin', `git@github.com:${credentials.username}/${folderName}.git`);
+    }
+
+    // Ahora, realiza el commit y el push
     await git.add('.');
     await git.commit('Initial commit');
-    await git.addRemote('origin', `git@github.com:${credentials.username}/${folderName}.git`);
     await git.push('origin', 'main');
     console.log('Code pushed to GitHub successfully.');
   } catch (err) {
